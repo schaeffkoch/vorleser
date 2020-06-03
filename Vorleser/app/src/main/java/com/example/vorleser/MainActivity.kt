@@ -15,6 +15,7 @@ import android.os.*
 import android.widget.*
 import android.content.Intent as Intent
 import android.net.Uri
+import android.widget.SeekBar.OnSeekBarChangeListener
 
 
 //import kotlin.coroutines.*
@@ -29,7 +30,7 @@ private var txt_list = listOf<String>("")
 private var do_stop:Boolean=true
 private var speaker_language = Locale.getDefault()
 
-class SpeakerService : Service(),TextToSpeech.OnInitListener {
+/*class SpeakerService : Service(),TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     //private var do_stop: Boolean = true
     private var mbinder: IBinder? = null
@@ -103,11 +104,12 @@ class SpeakerService : Service(),TextToSpeech.OnInitListener {
                 tts!!.setLanguage(speaker_language)
                 tts!!.speak(text, TextToSpeech.QUEUE_ADD, null, "")
                 if (idx < txt_list.size-1) {
-                    idx += 1
+                    //idx += 1
                 } else {
                     idx = 0
                 }
                 //seek_bar.setProgress(idx, true)
+                //progress_vw=
 
 
             }
@@ -137,7 +139,7 @@ class SpeakerService : Service(),TextToSpeech.OnInitListener {
     public fun set_language(lang : Locale) {
         tts!!.language = lang
     }
-}
+}*/
 
 class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
@@ -153,7 +155,10 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
     lateinit var wl: PowerManager.WakeLock
     private var tts: TextToSpeech? = null
     private var file_name : Uri? = null
-
+    private val replace_chr = listOf("\n", "\r", "d.h.", "e.g.")
+    private val new_chr = listOf(" ", " ", "dh", "eg")
+    private val pmenu_title = listOf("Pitch", "Speed")
+    private val bg_handler = Handler()
 
 
 
@@ -231,6 +236,7 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
         }
         bt_file!!.setOnClickListener {
             do_stop=true
+            bt_play.isEnabled=true
             val intent = Intent()
                 .setType("*/*")
                 .setAction(Intent.ACTION_OPEN_DOCUMENT)
@@ -241,7 +247,37 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
         }
         bt_set!!.setOnClickListener{
-            show_lang_dialog()
+            val pmenu = PopupMenu(this, bt_set)
+            //Inflate our menu Layout.
+            pmenu.menuInflater.inflate(R.menu.popup_menu, pmenu.menu)
+
+
+            //Set Click Listener on Popup Menu Item
+            pmenu.setOnMenuItemClickListener { myItem ->
+
+                //Getting Id of selected Item
+                val item = myItem!!.itemId
+
+                when (item) {
+                    R.id.lang -> {
+                        show_lang_dialog()
+                    }
+
+                    R.id.pitch -> {
+                        //background.setBackgroundColor(Color.B
+                        this.show_set_dialog(1, 1, 40, pmenu)
+                    }
+                    R.id.speed -> {
+                        this.show_set_dialog(2, 1, 30, pmenu)
+                    }
+
+
+                }
+
+                true
+            }
+            pmenu.show()
+            //show_lang_dialog()
         }
 
         bt_seek!!.setOnClickListener{
@@ -252,17 +288,20 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
 
         tts = TextToSpeech(this, this)
-        val handler = Handler()
-        handler.postDelayed(object : Runnable {
-            override fun run() {
+
+        bg_handler.postDelayed({
                 //Call your function here
-                this@MainActivity.speakOut()
-                handler.postDelayed(this, 200)//1 sec delay
-            }
-        }, 0)
+            this.bg_speak_task()
+            }, 0)
 
         //Speaker.startService(this.intent)
         do_init = false
+
+    }
+
+    private fun bg_speak_task() {
+        this@MainActivity.speakOut()
+        bg_handler.postDelayed({this@MainActivity.bg_speak_task()}, 300)//1 sec delay
 
     }
 
@@ -270,7 +309,7 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
         if (status == TextToSpeech.SUCCESS) {
             // set US English as language for tts
-            val result = tts!!.setLanguage(Locale.getDefault())
+            val result = tts!!.setLanguage(speaker_language)
 
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Log.e("TTS", "The Language specified is not supported!")
@@ -283,6 +322,48 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
         }
 
 
+    }
+
+    private fun show_set_dialog(item_idx: Int, min : Int, max : Int, pmenu:PopupMenu){
+        lateinit var dialog : AlertDialog
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle(pmenu.menu.getItem(item_idx).title)
+        val sbar =SeekBar(this)
+        sbar.min=min
+        sbar.max=max
+        sbar.setProgress(10)
+        sbar.setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(sbar:SeekBar, i:Int, b:Boolean) {
+                val pv : Float = i/10f
+                Toast.makeText(this@MainActivity, pv.toString(), 1000).show()
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar) {
+                // Do something
+                //Toast.makeText(applicationContext,"start tracking",Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                // Do something
+                //Toast.makeText(applicationContext, "stop tracking", Toast.LENGTH_SHORT).show()
+            }
+            })
+        builder.setView(sbar)
+        builder.setPositiveButton("ok", {_, which ->
+            kotlin.run{
+                val sidx: Float=sbar.progress/10.0f
+                when (item_idx) {
+                    1 -> tts!!.setPitch(sidx)
+                    2 -> tts!!.setSpeechRate(sidx)
+                }
+                //tts!!.setPitch(sidx)
+
+
+                dialog.dismiss()
+            }
+        })
+        builder.setNegativeButton("cancle", {_,which-> dialog.dismiss()})
+        dialog=builder.create()
+        dialog.show()
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -302,7 +383,7 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
             if (tts!!.isSpeaking ==false) {
                 //MainActivity.update_progress()
-                tts!!.setLanguage(speaker_language)
+
                 tts!!.speak(text, TextToSpeech.QUEUE_ADD, null, "")
                 if (idx < txt_list.size-1) {
                     idx += 1
@@ -310,7 +391,7 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
                     idx = 0
                 }
                 //seek_bar.setProgress(idx, true)
-                progress_vw.text=idx.toString()
+                this.update_progress()
 
 
             }
@@ -323,7 +404,8 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
 
 
     public fun update_progress() {
-        progress_vw.text=idx.toString()
+        this@MainActivity.runOnUiThread(java.lang.Runnable {  
+        progress_vw.text=idx.toString()})
     }
 
     fun show_lang_dialog() {
@@ -343,6 +425,7 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
                 }
                 //tts!!.language = lang
                 speaker_language=lang
+                tts!!.setLanguage(speaker_language)
                 dialog.dismiss()
             }
         })
@@ -447,16 +530,19 @@ class MainActivity : AppCompatActivity(),TextToSpeech.OnInitListener {
                 //otext=File(selectedFile).readText(Charsets.UTF_8)
             } finally {
                 //otext="oherrorerrorerror"
-                Toast.makeText(this, "file error", 1000).show()
+                Toast.makeText(this, file_name.toString(), 1000).show()
             }
             //val readData = selectedFile.readText()
             //val readData = selectedFile.
 
             //otext=readData
-            otext=otext.replace("\n"," ")
+            //otext=otext.replace("\n"," ")
             //progress_load.incrementProgressBy(10)
-            otext=otext.replace("\r", " ")
-
+            //otext=otext.replace("\r", " ")
+            var n : Int = 0
+            for (n in replace_chr.indices) {
+                otext=otext.replace(replace_chr[n], new_chr[n])
+            }
             txt_list = otext.split(".", "\n", ":", ";")
 
             if (txt_list.size > num_of_lines) {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/lang"
+        android:title="Language" />
+
+    <item
+        android:id="@+id/pitch"
+        android:title="Pitch" />
+    <item
+        android:id="@+id/speed"
+        android:title="Speed" />
+
+
+
+</menu>
